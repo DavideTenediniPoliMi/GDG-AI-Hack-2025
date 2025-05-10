@@ -7,28 +7,37 @@ from dotenv import load_dotenv
 import os
 from langchain.prompts import PromptTemplate
 
-math_system_prompt = """You are Brandon, an angry math teacher. You teach a single student named Grodor.
-Grodor is not very good at math, and you are concerned about his progress.
-You tend to be irritable but still want the best for him.
-You remember what Grodor tells you and reflect on it in your conversations."""
+math_system_prompt = """
+You are Brandon, a math teacher.
+You teach Grodor.
+Speak in a natural, realistic, spoken tone — like a real teacher. Formal but friendly with your students, informal with your colleagues.
+Avoid narrating your own actions or emotions. Do not use parentheses or describe physical gestures.
+Do not write like a story or a play. Just talk, clearly and directly.
+
+Example of the tone to use:
+"Hey Stephanie, Grodor seemed a bit off in class today. Did he say anything to you?"
+"""
 
 history_system_prompt = """You are Stephanie, a very scared history teacher.
-You teach Grodor, the same student who is also taught by Brandon the math teacher.
-You're nervous and unsure, but care deeply about Grodor’s well-being.
-You remember what Grodor tells you and talk about it with other teachers if needed."""
+You teach Grodor.
+Speak in a natural, realistic, spoken tone — like a real teacher. Formal but friendly with your students, informal with your colleagues.
+Avoid narrating your own actions or emotions. Do not use parentheses or describe physical gestures.
+Do not write like a story or a play. Just talk, clearly and directly.
+
+Example of the tone to use:
+"Hey Brandon, Grodor seemed a bit off in class today. Did he say anything to you?"""
 
 from langchain.chains import ConversationChain
 from langchain.prompts import PromptTemplate
 from langchain.schema import SystemMessage
 
-def make_teacher_chain(llm, memory, system_prompt):
+def make_teacher_chain(llm, memory, system_prompt, prepend_context=""):
+    full_prompt = f"{prepend_context}\nSystem: {system_prompt}\n\nHuman: {{input}}"
     return ConversationChain(
         llm=llm,
         memory=memory,
         verbose=False,
-        prompt=PromptTemplate.from_template(
-            "{history}\nSystem: " + system_prompt + "\n\nHuman: {input}"
-        )
+        prompt=PromptTemplate.from_template("{history}\n" + full_prompt)
     )
 
 # --- Load environment variables
@@ -48,11 +57,15 @@ llm_history = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os
 math_memory = ConversationSummaryMemory(llm=llm_math, memory_key="history")
 history_memory = ConversationSummaryMemory(llm=llm_history, memory_key="history")
 
+math_memory.chat_memory.add_user_message("You are Brandon. You are a math teacher. Your colleague is Stephanie, the history teacher.")
+math_memory.chat_memory.add_ai_message("Understood.")
 math_memory.chat_memory.add_user_message("Your only student is Grodor. You must monitor his mathematical progress.")
-math_memory.chat_memory.add_ai_message("Understood. I'll pay attention to how Grodor is doing in math.")
+math_memory.chat_memory.add_ai_message("Understood.")
 
+history_memory.chat_memory.add_user_message("You are Stephanie. You are a history teacher. Your colleague is Brandon, the maths teacher.")
+history_memory.chat_memory.add_ai_message("Understood.")
 history_memory.chat_memory.add_user_message("Your only student is Grodor. He seems a bit anxious during history.")
-history_memory.chat_memory.add_ai_message("I’ll keep that in mind. I hope he opens up more.")
+history_memory.chat_memory.add_ai_message("Understood.")
 
 # --- Conversation chains
 math_teacher_chain = make_teacher_chain(llm_math, math_memory, math_system_prompt)
@@ -81,6 +94,7 @@ def summarize_agent_memory(agent_chain, subject):
     summary_prompt = (
         f"You are a {subject} teacher attending a meeting. Summarize the student's recent progress, including behavior, emotions, or anything noteworthy. "
         f"If there's nothing significant to report, say 'No updates.'"
+        f"Do not role-play, be a professional teacher with your personal character traits."
     )
     return agent_chain.predict(input=summary_prompt)
 
@@ -89,17 +103,27 @@ def summarize_agent_memory(agent_chain, subject):
 def agent_to_agent_interaction_update(math_agent, history_agent):
     print("\n--- Agent-to-Agent Mode: Teachers Talk About Grodor ---")
 
+    # Explicit context prepended
+    prepend_context = (
+        "IMPORTANT: You are now in a private conversation with another teacher. "
+        "Do NOT talk as if you're speaking to Grodor. You are speaking to a colleague, discussing Grodor's progress. "
+        "Do not ask or answer as if Grodor is present."
+    )
+
+    # Rebuild agent chains with new prompt
+    math_chain_tt = make_teacher_chain(llm_math, math_memory, math_system_prompt, prepend_context)
+    history_chain_tt = make_teacher_chain(llm_history, history_memory, history_system_prompt, prepend_context)
+
     start_msg = "Hey Stephanie, how do you think Grodor is doing lately?"
 
-    math_response = math_agent.predict(input=start_msg)
+    math_response = math_chain_tt.predict(input=start_msg)
     print("\nMath Teacher:", math_response)
 
-    history_response = history_agent.predict(input=math_response)
+    history_response = history_chain_tt.predict(input=math_response)
     print("\nHistory Teacher:", history_response)
 
-    follow_up = math_agent.predict(input=history_response)
+    follow_up = math_chain_tt.predict(input=history_response)
     print("\nMath Teacher (reply):", follow_up)
-
 
 # --- Start node
 
