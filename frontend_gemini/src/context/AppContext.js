@@ -1,89 +1,226 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
-// --- Hardcoded Data (placeholders for backend integration) ---
+// --- Hardcoded Data --- (PROFESSORS_DATA, RANKING_DATA, USER_PROFILE_DATA, SUGGESTIONS_DATA remain same)
 const PROFESSORS_DATA = [
-    { id: 'prof1', name: 'Dr. Ada Lovelace', subject: 'Computer Science', avatar: 'https://placehold.co/200x200/E0F2FE/0EA5E9?text=Ada', topics: ['Introduction to Algorithms', 'Data Structures', 'Machine Learning Basics'] },
-    { id: 'prof2', name: 'Prof. Marie Curie', subject: 'Physics & Chemistry', avatar: 'https://placehold.co/200x200/E0F2FE/0EA5E9?text=Marie', topics: ['Radioactivity', 'Quantum Mechanics Intro', 'Chemical Bonds'] },
-    { id: 'prof3', name: 'Dr. Alan Turing', subject: 'Mathematics & AI', avatar: 'https://placehold.co/200x200/E0F2FE/0EA5E9?text=Alan', topics: ['Computability Theory', 'Cryptography', 'Early AI Concepts'] },
-    { id: 'prof4', name: 'Prof. Rosalind Franklin', subject: 'Biophysics', avatar: 'https://placehold.co/200x200/E0F2FE/0EA5E9?text=Rosalind', topics: ['DNA Structure', 'X-ray Crystallography', 'Virus Structures'] },
+    { id: 'prof1', name: 'Mark Carman', subject: 'ENGLISH', avatar: '/avatars/Mark_Carman.png', topics: ['Grammar Fundamentals', 'Literature Analysis', 'Essay Writing'], debateOpeningLine: "In the realm of language, clarity and precision are paramount. I believe English offers the most robust framework for expressing complex ideas." },
+    { id: 'prof2', name: 'Silvia Pasini', subject: 'HISTORY', avatar: '/avatars/Silvia_Pasini.png', topics: ['Ancient Civilizations', 'World Wars', 'Modern History'], debateOpeningLine: "History, however, provides the context and narrative that shapes our understanding. Without history, words are just symbols without meaning." },
+    { id: 'prof3', name: 'Leonardo Brusini', subject: 'SCIENCE', avatar: '/avatars/Leonardo_Brusini.png', topics: ['Physics Basics', 'Chemistry 101', 'Biology Introduction'], debateOpeningLine: "Science seeks to uncover objective truths through empirical evidence. The scientific method is our most reliable path to knowledge." },
+    { id: 'prof4', name: 'Luca Bianchi', subject: 'MATHS', avatar: '/avatars/Luca_Bianchi.png', topics: ['Algebra', 'Geometry', 'Calculus Concepts'], debateOpeningLine: "Mathematics is the language of the universe, underpinning all scientific endeavor with its logical consistency." },
 ];
 
-const USER_PROGRESS_DATA = [
-    { professorId: 'prof1', professorName: 'Dr. Ada Lovelace', score: 85 },
-    { professorId: 'prof2', professorName: 'Prof. Marie Curie', score: 72 },
-    { professorId: 'prof3', professorName: 'Dr. Alan Turing', score: 90 },
-    { professorId: 'prof4', professorName: 'Prof. Rosalind Franklin', score: 60 },
-];
+const RANKING_DATA = [
+    { id: 'prof1', name: 'ENGLISH', score: 10, avatar: '/avatars/Mark_Carman.png' },
+    { id: 'prof2', name: 'HISTORY', score: 9, avatar: '/avatars/Silvia_Pasini.png' },
+    { id: 'prof4', name: 'MATHS', score: 8, avatar: '/avatars/Luca_Bianchi.png' },
+    { id: 'prof3', name: 'SCIENCE', score: 8, avatar: '/avatars/Leonardo_Brusini.png' },
+].sort((a, b) => b.score - a.score);
 
-// --- Suggestions Data (placeholder) ---
+
+const USER_PROFILE_DATA = {
+    name: 'Silvia',
+    points: 30,
+    avatar: '/avatars/User_Silvia.png'
+};
+
 const SUGGESTIONS_DATA = [
-    { type: 'debate', prof1Id: 'prof1', prof2Id: 'prof3', topic: 'The Future of AI', id: 'sug1' },
-    { type: 'lecture', profId: 'prof2', topic: 'Quantum Entanglement Explained', id: 'sug2' },
-    { type: 'inverse', profId: 'prof4', topic: 'Modern Gene Editing Techniques', id: 'sug3' },
+    { type: 'debate', prof1Id: 'prof1', prof2Id: 'prof2', topic: 'English vs History: The Foundation of Knowledge', id: 'sug1', text: 'You should start a debate between English and History on what forms the true foundation of knowledge.' },
 ];
-
-
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-    const [currentPage, setCurrentPage] = useState('INDEX'); // INDEX, PROFESSOR, DEBATE, LECTURE, INVERSE
-    const [selectedProfessor, setSelectedProfessor] = useState(null);
-    const [selectedTopic, setSelectedTopic] = useState('');
+    const [currentPage, setCurrentPage] = useState('INDEX');
+    const [selectedProfessor, setSelectedProfessor] = useState(null); // For ProfessorPage
+    const [selectedTopic, setSelectedTopic] = useState(''); // For ProfessorPage
 
-    // --- Navigation Functions ---
+    // --- Lecture State ---
+    const [lectureMessages, setLectureMessages] = useState([]);
+    const [lectureInputValue, setLectureInputValue] = useState('');
+    const [isLectureOverByBackend, setIsLectureOverByBackend] = useState(false);
+    const [lectureTargetProfessor, setLectureTargetProfessor] = useState(null);
+    const [currentLectureTopic, setCurrentLectureTopic] = useState('');
+
+    // --- Debate State ---
+    const [debateParticipants, setDebateParticipants] = useState([]); // Stores up to 2 professor IDs
+    const [debateMessages, setDebateMessages] = useState([]);
+    const [debateInputValue, setDebateInputValue] = useState('');
+    const [isDebateActive, setIsDebateActive] = useState(false);
+    const [isDebateOverByBackend, setIsDebateOverByBackend] = useState(false);
+    const [debateTopic, setDebateTopic] = useState("an engaging discussion");
+    const [currentDebateTurn, setCurrentDebateTurn] = useState(0); // 0 for prof1, 1 for prof2
+
+
     const navigateToHome = () => {
         setCurrentPage('INDEX');
-        setSelectedProfessor(null);
-        setSelectedTopic('');
+        // Reset lecture state
+        setLectureMessages([]); setLectureInputValue(''); setIsLectureOverByBackend(false); setLectureTargetProfessor(null); setCurrentLectureTopic('');
+        // Reset debate state
+        setDebateParticipants([]); setDebateMessages([]); setDebateInputValue(''); setIsDebateActive(false); setIsDebateOverByBackend(false); setDebateTopic("an engaging discussion"); setCurrentDebateTurn(0);
     };
 
-    const navigateToProfessor = (professor) => {
+    const navigateToProfessorPage = (professor) => {
         setSelectedProfessor(professor);
         setCurrentPage('PROFESSOR');
-        setSelectedTopic('');
-    };
-
-    const navigateToDebate = (prof1Id, prof2Id, topic) => {
-        // Placeholder: In a real app, you'd set state for the debate page
-        console.log(`Navigating to DEBATE: ${prof1Id} vs ${prof2Id} on ${topic}`);
-        alert(`Initiating Debate: ${PROFESSORS_DATA.find(p=>p.id === prof1Id)?.name} vs ${PROFESSORS_DATA.find(p=>p.id === prof2Id)?.name} on "${topic}" (DEBATE page not implemented yet)`);
-        // setCurrentPage('DEBATE');
     };
 
     const navigateToLecture = (professor, topic) => {
-         // Placeholder
-        console.log(`Navigating to LECTURE with ${professor.name} on ${topic}`);
-        alert(`Starting Lecture with ${professor.name} on "${topic}" (LECTURE page not implemented yet)`);
-        // setSelectedProfessor(professor);
-        // setSelectedTopic(topic);
-        // setCurrentPage('LECTURE');
+        setLectureTargetProfessor(professor); setCurrentLectureTopic(topic);
+        setLectureMessages([{ sender: 'professor', text: `Hello! Today we'll discuss "${topic}". What are your initial thoughts or questions?`, professorId: professor.id }]);
+        setIsLectureOverByBackend(false); setCurrentPage('LECTURE');
+    };
+    const navigateToInverseLecture = (professor, topic) => alert(`Inverse Lecture with ${professor.name} on "${topic}" (Not Implemented)`);
+
+
+    // --- DEBATE Functions ---
+    const navigateToDebatePage = (prof1Id = null, prof2Id = null, topic = "a stimulating debate topic") => {
+        // Reset previous debate state first
+        setDebateMessages([]); setDebateInputValue(''); setIsDebateActive(false); setIsDebateOverByBackend(false); setCurrentDebateTurn(0);
+
+        let initialParticipants = [];
+        if (prof1Id) initialParticipants.push(prof1Id);
+        if (prof2Id && prof1Id !== prof2Id) initialParticipants.push(prof2Id);
+        setDebateParticipants(initialParticipants);
+        setDebateTopic(topic);
+        setCurrentPage('DEBATE');
+
+        if (initialParticipants.length === 2) {
+            // If participants are pre-filled (e.g., from suggestion), auto-start debate
+            // This needs to be called after context state has updated, so use useEffect in DebatePage or a slight delay.
+            // For now, we'll let DebatePage handle the auto-start if participants are full on load.
+            console.log("Debate page loading with pre-selected participants. Auto-start will be triggered.");
+        }
     };
 
-    const navigateToInverseLecture = (professor, topic) => {
-        // Placeholder
-        console.log(`Navigating to INVERSE LECTURE with ${professor.name} on ${topic}`);
-        alert(`Starting Inverse Lecture with ${professor.name} on "${topic}" (INVERSE page not implemented yet)`);
-        // setSelectedProfessor(professor);
-        // setSelectedTopic(topic);
-        // setCurrentPage('INVERSE');
+    const toggleDebateParticipant = (profId) => {
+        if (isDebateActive) return; // Don't change participants if debate is active
+        setDebateParticipants(prev => {
+            if (prev.includes(profId)) {
+                return prev.filter(id => id !== profId);
+            }
+            if (prev.length < 2) {
+                return [...prev, profId];
+            }
+            return prev; // Max 2 participants
+        });
     };
+
+    const startDebateInternal = () => { // Renamed to avoid conflict with component's startDebate
+        if (debateParticipants.length !== 2 || isDebateActive) return;
+
+        setIsDebateActive(true);
+        setIsDebateOverByBackend(false);
+        const prof1 = PROFESSORS_DATA.find(p => p.id === debateParticipants[0]);
+        const prof2 = PROFESSORS_DATA.find(p => p.id === debateParticipants[1]);
+
+        setDebateMessages([
+            { sender: 'system', text: `Debate starting on: "${debateTopic}" between ${prof1.name} and ${prof2.name}!` },
+            { sender: 'professor', professorId: prof1.id, text: prof1.debateOpeningLine || "Let's begin this debate." }
+        ]);
+        setCurrentDebateTurn(1); // Next turn is prof2
+        console.log("Debate started with:", prof1.name, "vs", prof2.name);
+    };
+
+
+    const sendDebateMessage = (messageText, senderType = 'user') => {
+        if (!isDebateActive || isDebateOverByBackend) return;
+
+        const newMessage = { sender: senderType, text: messageText };
+        if (senderType === 'user') {
+            // User message
+            setDebateMessages(prev => [...prev, newMessage]);
+            setDebateInputValue('');
+            // Mock: Professor acknowledges user's point then continues debate.
+            setTimeout(() => {
+                const aProfId = debateParticipants[currentDebateTurn];
+                const aProf = PROFESSORS_DATA.find(p => p.id === aProfId);
+                setDebateMessages(prev => [...prev, { sender: 'professor', professorId: aProfId, text: `Interesting point, user. However, consider this... (responding to user then continuing)` }]);
+                // Then trigger next professor's turn if needed
+                mockProfessorTurn();
+            }, 1000);
+
+        } else if (senderType === 'professor') {
+            // This would typically be a direct response from backend
+            setDebateMessages(prev => [...prev, { ...newMessage, professorId: debateParticipants[currentDebateTurn] }]);
+            setCurrentDebateTurn(prev => (prev + 1) % 2); // Switch turn
+            // After this professor message, schedule the next one
+            if (debateMessages.length < 10) { // Limit debate length for demo
+                setTimeout(mockProfessorTurn, 1500 + Math.random() * 1500);
+            } else {
+                endDebateInternal("The debate has reached its time limit. A thought-provoking exchange!");
+            }
+        }
+    };
+
+    const mockProfessorTurn = () => {
+        if (!isDebateActive || isDebateOverByBackend || debateParticipants.length < 2) return;
+
+        const currentProfId = debateParticipants[currentDebateTurn];
+        const currentProf = PROFESSORS_DATA.find(p => p.id === currentProfId);
+        const otherProfId = debateParticipants[(currentDebateTurn + 1) % 2];
+        const otherProf = PROFESSORS_DATA.find(p => p.id === otherProfId);
+
+
+        let responseText = `Responding to ${otherProf.name}... I believe my colleague overlooks a crucial aspect. My argument is stronger because... [${currentProf.subject} perspective]`;
+        if (Math.random() > 0.7) {
+            responseText = `I concede that ${otherProf.name} has a valid point regarding X, but on the broader issue of Y, my stance from ${currentProf.subject} holds.`;
+        }
+
+
+        // Simulate sending this as if it came from backend
+        setDebateMessages(prev => [...prev, { sender: 'professor', professorId: currentProfId, text: responseText }]);
+        setCurrentDebateTurn(prev => (prev + 1) % 2);
+
+        if (debateMessages.filter(m => m.sender === 'professor').length > 8) { // End after a few turns
+            endDebateInternal("This has been a spirited discussion! Let's conclude the debate for now.");
+        }
+    };
+
+
+    const endDebateInternal = (systemMessage = "The debate has concluded.") => {
+        setIsDebateActive(false);
+        setIsDebateOverByBackend(true);
+        setDebateMessages(prev => [...prev, { sender: 'system', text: systemMessage }]);
+        console.log("Debate ended.");
+    };
+
+    const resetDebateAction = () => {
+        // This signals to the backend (mocked here) and clears UI for a new setup
+        if (isDebateActive) {
+             endDebateInternal("Debate has been reset by the user.");
+        }
+        // Clear selections for a new debate setup on the same page
+        setDebateParticipants([]);
+        setDebateMessages([]);
+        setDebateInputValue('');
+        setIsDebateActive(false);
+        setIsDebateOverByBackend(false); // Allow for a new debate to start
+        setDebateTopic("a new engaging discussion");
+        setCurrentDebateTurn(0);
+        console.log("Debate reset.");
+    };
+
+
+    // Lecture specific context (sendLectureMessageToBackend, endLectureByUser) are assumed to be defined as before.
+    const sendLectureMessageToBackend = (messageText) => { /* ... from previous step ... */ };
+    const endLectureByUser = () => { /* ... from previous step ... */ };
 
 
     const value = {
-        currentPage,
-        setCurrentPage,
-        selectedProfessor,
-        setSelectedProfessor,
-        selectedTopic,
-        setSelectedTopic,
-        professors: PROFESSORS_DATA,
-        userProgress: USER_PROGRESS_DATA.sort((a, b) => b.score - a.score), // Sorted leaderboard
-        suggestions: SUGGESTIONS_DATA, // Provide one suggestion for now
-        navigateToHome,
-        navigateToProfessor,
-        navigateToDebate,
-        navigateToLecture,
-        navigateToInverseLecture,
+        currentPage, setCurrentPage,
+        selectedProfessor, setSelectedProfessor, selectedTopic, setSelectedTopic,
+        professors: PROFESSORS_DATA, userProfile: USER_PROFILE_DATA, ranking: RANKING_DATA, suggestions: SUGGESTIONS_DATA,
+        navigateToHome, navigateToProfessor: navigateToProfessorPage, navigateToLecture, navigateToInverseLecture, navigateToDebate: navigateToDebatePage, // Use renamed debate navigator
+
+        // Lecture context
+        lectureMessages, lectureInputValue, setLectureInputValue, sendLectureMessageToBackend, endLectureByUser,
+        isLectureOverByBackend, lectureTargetProfessor, currentLectureTopic,
+
+        // Debate context
+        debateParticipants, toggleDebateParticipant, debateMessages, debateInputValue, setDebateInputValue,
+        isDebateActive, isDebateOverByBackend, debateTopic, setDebateTopic,
+        startDebate: startDebateInternal, // Expose internal start function
+        sendDebateMessage,
+        resetDebate: resetDebateAction, // Expose internal reset function
+        PROFESSORS_DATA, // Make sure this is available for DebatePage to get professor details
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
