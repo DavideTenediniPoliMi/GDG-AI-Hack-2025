@@ -60,8 +60,6 @@ export const AppProvider = ({ children }) => {
     // Changed from IntervalRef to TimeoutRef for setTimeout polling
     const debatePollingTimeoutRef = useRef(null); // Ref to store the timeout ID
 
-    const [ranking, setRanking] = useState(RANKING_DATA);
-
     // Helper to find professor details
     const getProfessorById = (id) => PROFESSORS_DATA.find(p => p.id === id);
 
