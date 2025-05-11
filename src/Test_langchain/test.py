@@ -9,7 +9,7 @@ class AgentState(TypedDict):
     selected_agent: Literal["math_teacher", "history_teacher"]
 
 # --- LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key="AIzaSyAO3csgWsiFP4d5pa7ofnKd6O98hzze60c")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key="asdjibisudf")
 
 # --- Nodes
 def start_node(state: AgentState) -> AgentState:
