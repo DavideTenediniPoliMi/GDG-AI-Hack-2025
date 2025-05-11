@@ -1,7 +1,7 @@
 // DebateWinnerScreen.js
 
 import React, { useState } from 'react';
-import Button from '../components/Button'; // Assuming you have a Button component
+import Button from './Button'; // Assuming you have a Button component
 
 const DebateWinnerScreen = ({ prof1, prof2, onVote, onReset }) => {
   const [winner, setWinner] = useState(null);
