@@ -6,11 +6,18 @@ from agent import Agent, Professor
 
 # Initialize the agent instance
 professors = {
-    "prof1": Professor("Mark Carman", "math teacher", "../data.txt"),
+    "prof1": Professor(
+        "Mark Carman",
+        "You are an english professor.",
+        "../english_professor.txt",
+    ),
     "prof2": Professor("Silvia Pasini", "history teacher", "../data.txt"),
     "prof3": Professor(
-        "Leonardo Brusini", "angry math teacher", "../data.txt"
+        "Leonardo Brusini",
+        "You are a science professor.",
+        "../science_professor.txt",
     ),
+    "prof4": Professor("Luca Bianchi", "angry history teacher", "../data.txt"),
 }
 
 end_detection = Agent(
@@ -143,7 +150,7 @@ def debate(request: DebateRequest):
         )
     elif request.user_input != "":
         # Process the user's query
-        p = p1 if debate_state["last_speaker"] == 1 else p2
+        p = p1 if debate_state["last_speaker"] == 2 else p2
         response = p.process_query(
             debate_state["last_message"]
             + "\n\nSTUDENT: "
