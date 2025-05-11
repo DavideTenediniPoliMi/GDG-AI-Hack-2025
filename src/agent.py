@@ -67,7 +67,9 @@ class Professor(Agent):
         super().__init__(name, personality_prompt)
         content = self.load_file(content_path)
         self.initial_instruction = (
-            base_prompt(content) + "\n" + personality_prompt
+            base_prompt(content)
+            + f"\n Your name is {self.name}. "
+            + personality_prompt
         )
 
     def load_file(self, path: str) -> str:

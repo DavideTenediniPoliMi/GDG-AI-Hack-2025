@@ -39,6 +39,16 @@ class ChatRequest(BaseModel):
     is_initial: bool = False
 
 
+class DebateRequest(BaseModel):
+    session_id: str = None
+    user_input: str
+    prof_id1: str
+    prof_id2: str
+    session_closed: bool = False
+    is_initial: bool = False
+    topic: str = None
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     """Handle chat requests from the user."""
@@ -70,7 +80,7 @@ def chat(request: ChatRequest):
 
     # Check if the user wants to end the conversation
     _, _ = end_detection.get_or_create_chain(session_id)
-    end_response = end_detection.process_query(request.user_input, session_id)
+    end_response = end_detection.process_query(response, session_id)
     print("This is the end response", end_response)
     if end_response == "1":
         return {
@@ -83,4 +93,82 @@ def chat(request: ChatRequest):
         "session_id": session_id,
         "response": response,
         "session_closed": False,
+    }
+
+
+debate_state = {
+    "state": "WAITING",  # Possible states: WAITING, P1_TALKED, P2_TALKED,
+    "last_message": None,
+    "last_sender": None,  # Possible senders: 0, 1, 2 # 0: user, 1: prof1, 2: prof2
+}
+
+
+@app.post("/debate")
+def debate(request: DebateRequest):
+    """Handle debate requests between two professors."""
+    print(f"Received debate request: {request}")
+    p1 = professors.get(request.prof_id1)
+    p2 = professors.get(request.prof_id2)
+    if not p1 or not p2:
+        return {"error": "Invalid professor IDs."}
+    # Create a new conversation chain for the debate
+    conversation_chain1, session_id1 = p1.get_or_create_chain(
+        request.session_id
+    )
+    conversation_chain2, session_id2 = p2.get_or_create_chain(
+        request.session_id
+    )
+
+    if request.session_closed:
+        p1.add_context(
+            session_id1,
+            "The student left the debate. You should stop explaining and wait for a new activity to start.",
+        )
+        p2.add_context(
+            session_id2,
+            "The student left the debate. You should stop explaining and wait for a new activity to start.",
+        )
+        return {"session_id": session_id1, "session_closed": True}
+
+    if request.is_initial:
+        # Add the initial instruction to the conversation chain
+        response = p1.process_query(
+            "You are starting a new debate with another professor. Introduce yourself. The user is also listening and might intervene. The topic is",
+            session_id1,
+        )
+        debate_state["last_speaker"] = 1
+        debate_state["last_message"] = response
+        p2.add_context(
+            session_id2,
+            "You are starting a new debate with another professor. Introduce yourself. The user is also listening and might intervene. The topic is",
+        )
+    else:
+        # Process the user's query
+        p = p1 if debate_state["last_speaker"] == 1 else p2
+        response = p.process_query(debate_state["last_message"], session_id1)
+        debate_state["last_speaker"] = (
+            2 if debate_state["last_speaker"] == 1 else 1
+        )
+        debate_state["last_message"] = response
+
+    _, _ = end_detection.get_or_create_chain(session_id1)
+    end_response = end_detection.process_query(response, session_id1)
+    print("This is the end response", end_response)
+    if end_response == "1":
+        return {
+            "session_id": session_id1,
+            "session_closed": True,
+            "response": response,
+            "from": request.prof_id1
+            if debate_state["last_speaker"] == 1
+            else request.prof_id2,
+        }
+
+    return {
+        "session_id": session_id1,
+        "session_closed": False,
+        "response": response,
+        "from": request.prof_id1
+        if debate_state["last_speaker"] == 1
+        else request.prof_id2,
     }
