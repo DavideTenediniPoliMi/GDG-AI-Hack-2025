@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from agent import Professor
 
 # Initialize the agent instance
-agent = Professor()
+agent = Professor("Carman", "math teacher", "../data.txt")
 
 # FastAPI app
 app = FastAPI()
@@ -23,7 +23,6 @@ def chat(request: ChatRequest):
     conversation_chain, session_id = agent.get_or_create_chain(
         request.session_id
     )
-    print(f"Session ID: {session_id}")
 
     # Process the user's query
     response = agent.process_query(request.user_input, session_id)
