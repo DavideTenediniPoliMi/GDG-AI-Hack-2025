@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agent import Professor
@@ -8,6 +9,14 @@ agent = Professor("Carman", "math teacher", "../data.txt")
 
 # FastAPI app
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods, including OPTIONS
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 # Request model
