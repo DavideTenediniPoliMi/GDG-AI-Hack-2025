@@ -41,7 +41,7 @@ const LecturePage = () => {
         e.preventDefault();
         // Use isLectureLoading here as well to prevent sending while waiting for another response
         if (lectureInputValue.trim() && !isLectureOverByBackend && !isLectureLoading) {
-            sendLectureMessageToBackend(lectureInputValue.trim(), false); // Pass false for isInitial
+            sendLectureMessageToBackend(lectureInputValue.trim(), lectureTargetProfessor.id, false); // Pass false for isInitial
         }
     };
 
