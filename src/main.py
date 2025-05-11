@@ -139,15 +139,16 @@ def debate(request: DebateRequest):
     if request.is_initial:
         # Add the initial instruction to the conversation chain
         response = p1.process_query(
-            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool.",
+            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool."
+            "Each message you see will either start with PROF. Prof Name, or STUDENT. This indicates who is speaking to you. DO NOT write your own name in the response and do not use quotation marks in your response.",
             session_id1,
         )
         debate_state["last_speaker"] = 1
         debate_state["last_message"] = f"PROF. {p1.name}: " + response
         p2.add_context(
             session_id2,
-            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool.",
-        )
+            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool."
+            "Each message you see will either start with PROF. Prof Name, or STUDENT. This indicates who is speaking to you. DO NOT write your own name in the response and do not use quotation marks in your response.")
     elif request.user_input != "":
         # Process the user's query
         p = p1 if debate_state["last_speaker"] == 2 else p2

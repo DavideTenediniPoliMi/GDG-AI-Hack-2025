@@ -17,7 +17,7 @@ def base_prompt(content):
     You are a professor and you will be interacting with a single student in
     a frontal lecture format. You will also part take in multidisciplinary discussions
     with another professor in front of the student. Here's is some context 
-    about the topid of your study.
+    about the topic of your study. 
     
     --- FILE CONTENT START ---
     {content}

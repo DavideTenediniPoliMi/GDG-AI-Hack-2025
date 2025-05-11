@@ -32,7 +32,7 @@ const SUGGESTIONS_DATA = [
 const CHAT_API_URL = 'http://localhost:8000/chat'; // Lecture API URL
 const DEBATE_API_URL = 'http://localhost:8000/debate'; // Debate API URL
 const SESSION_ID = 'abc123-abc123-abc123-abc123'; // Hardcoded session ID (Consider generating unique IDs in a real app)
-const DEBATE_POLLING_INTERVAL = 10000    ; // Poll backend every 2 seconds for new debate messages
+const DEBATE_POLLING_INTERVAL = 15000; // Poll backend every 2 seconds for new debate messages
 
 const AppContext = createContext();
 
@@ -59,6 +59,8 @@ export const AppProvider = ({ children }) => {
     const [isDebateLoading, setIsDebateLoading] = useState(false); // State to indicate API call is in progress
     // Changed from IntervalRef to TimeoutRef for setTimeout polling
     const debatePollingTimeoutRef = useRef(null); // Ref to store the timeout ID
+
+    const [ranking, setRanking] = useState(RANKING_DATA);
 
     // Helper to find professor details
     const getProfessorById = (id) => PROFESSORS_DATA.find(p => p.id === id);
