@@ -1,3 +1,6 @@
+// AppContext.js
+
+//import { init } from 'express/lib/application';
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
 // --- Hardcoded Data --- (PROFESSORS_DATA, RANKING_DATA, USER_PROFILE_DATA, SUGGESTIONS_DATA remain same)
@@ -25,6 +28,11 @@ const USER_PROFILE_DATA = {
 const SUGGESTIONS_DATA = [
     { type: 'debate', prof1Id: 'prof1', prof2Id: 'prof2', topic: 'English vs History: The Foundation of Knowledge', id: 'sug1', text: 'You should start a debate between English and History on what forms the true foundation of knowledge.' },
 ];
+
+// --- API Constants ---
+const CHAT_API_URL = 'http://localhost:8000/chat'; // Or 'http://localhost:YOUR_PORT/chat' if not on default port 80
+const SESSION_ID = 'abc123-abc123-abc123-abc123'; // Hardcoded session ID
+
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -38,6 +46,7 @@ export const AppProvider = ({ children }) => {
     const [isLectureOverByBackend, setIsLectureOverByBackend] = useState(false);
     const [lectureTargetProfessor, setLectureTargetProfessor] = useState(null);
     const [currentLectureTopic, setCurrentLectureTopic] = useState('');
+    const [isLectureLoading, setIsLectureLoading] = useState(false); // State to indicate API call is in progress
 
     // --- Debate State ---
     const [debateParticipants, setDebateParticipants] = useState([]); // Stores up to 2 professor IDs
@@ -52,7 +61,7 @@ export const AppProvider = ({ children }) => {
     const navigateToHome = () => {
         setCurrentPage('INDEX');
         // Reset lecture state
-        setLectureMessages([]); setLectureInputValue(''); setIsLectureOverByBackend(false); setLectureTargetProfessor(null); setCurrentLectureTopic('');
+        setLectureMessages([]); setLectureInputValue(''); setIsLectureOverByBackend(false); setLectureTargetProfessor(null); setCurrentLectureTopic(''); setIsLectureLoading(false);
         // Reset debate state
         setDebateParticipants([]); setDebateMessages([]); setDebateInputValue(''); setIsDebateActive(false); setIsDebateOverByBackend(false); setDebateTopic("an engaging discussion"); setCurrentDebateTurn(0);
     };
@@ -62,15 +71,99 @@ export const AppProvider = ({ children }) => {
         setCurrentPage('PROFESSOR');
     };
 
-    const navigateToLecture = (professor, topic) => {
-        setLectureTargetProfessor(professor); setCurrentLectureTopic(topic);
-        setLectureMessages([{ sender: 'professor', text: `Hello! Today we'll discuss "${topic}". What are your initial thoughts or questions?`, professorId: professor.id }]);
-        setIsLectureOverByBackend(false); setCurrentPage('LECTURE');
+    const navigateToLecture = async (professor, topic) => {
+        // Reset lecture state before starting a new one
+        setLectureMessages([]);
+        setLectureInputValue('');
+        setIsLectureOverByBackend(false);
+        setIsLectureLoading(true); // Start loading state
+        setLectureTargetProfessor(professor);
+        setCurrentLectureTopic(topic);
+        setCurrentPage('LECTURE');
+
+        // Prepare the initial message input for the backend
+        const initialInput = ``;
+        const prof_id = professor.id;
+
+        // Send the initial message to the backend
+        await sendLectureMessageToBackend(initialInput, prof_id, true); // Pass true for isInitial
+
+        setIsLectureLoading(false); // End loading state after initial message attempt
     };
+
     const navigateToInverseLecture = (professor, topic) => alert(`Inverse Lecture with ${professor.name} on "${topic}" (Not Implemented)`);
 
 
-    // --- DEBATE Functions ---
+    // --- LECTURE Functions ---
+    const sendLectureMessageToBackend = async (messageText, prof_id, isInitial = false) => {
+        if (isLectureOverByBackend || isLectureLoading) return; // Prevent sending if lecture is over or already loading
+
+        let userInputToSend = messageText;
+
+        // Add user's message to the chat immediately (if it's not the initial internal call)
+        if (!isInitial) {
+             setLectureMessages(prev => [...prev, { sender: 'user', text: messageText}]);
+             setLectureInputValue(''); // Clear input field
+        } else {
+             // Optional: Add a '...' message while waiting for initial response
+             //setLectureMessages(prev => [...prev, { sender: 'user', text: 'Connecting to professor...'}]);
+        }
+
+        setIsLectureLoading(true); // Set loading state for API call
+
+        try {
+            const response = await fetch(CHAT_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    "session_id": SESSION_ID,
+                    "user_input": userInputToSend,
+                    "prof_id": prof_id,
+                    "is_initial": isInitial,
+                }),
+            });
+
+            if (!response.ok) {
+                // Handle non-200 responses
+                const errorText = await response.text();
+                throw new Error(`Backend error: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            // --- ASSUMPTION ---
+            // We assume the backend response is a JSON object like { "professor_response": "..." }
+            // Adjust this part if your backend returns a different format.
+            const professorResponse = data.response;
+
+            if (professorResponse) {
+                setLectureMessages(prev => [...prev, { sender: 'professor', text: professorResponse, professorId: lectureTargetProfessor?.id }]);
+            } else {
+                 // Handle cases where backend responds OK but no message is returned
+                 setLectureMessages(prev => [...prev, { sender: 'system', text: 'Received empty response from professor.' }]);
+                 setIsLectureOverByBackend(true); // Consider ending lecture on unexpected empty response
+            }
+
+        } catch (error) {
+            console.error("Error sending message to backend:", error);
+            setLectureMessages(prev => [...prev, { sender: 'system', text: `Communication error: ${error.message || 'Could not connect to the server.'} The lecture has ended.` }]);
+            setIsLectureOverByBackend(true); // End lecture on error
+        } finally {
+            setIsLectureLoading(false); // End loading state
+        }
+    };
+
+    const endLectureByUser = () => {
+         setIsLectureOverByBackend(true);
+         setLectureMessages(prev => [...prev, { sender: 'system', text: 'You have ended the lecture.' }]);
+         // Optionally, send a final message to the backend indicating the end
+         // sendLectureMessageToBackend('<end>', true); // Example end signal
+    };
+
+
+    // --- DEBATE Functions --- (Remain the same as provided)
     const navigateToDebatePage = (prof1Id = null, prof2Id = null, topic = "a stimulating debate topic") => {
         // Reset previous debate state first
         setDebateMessages([]); setDebateInputValue(''); setIsDebateActive(false); setIsDebateOverByBackend(false); setCurrentDebateTurn(0);
@@ -142,7 +235,7 @@ export const AppProvider = ({ children }) => {
             setDebateMessages(prev => [...prev, { ...newMessage, professorId: debateParticipants[currentDebateTurn] }]);
             setCurrentDebateTurn(prev => (prev + 1) % 2); // Switch turn
             // After this professor message, schedule the next one
-            if (debateMessages.length < 10) { // Limit debate length for demo
+            if (debateMessages.filter(m => m.sender === 'professor').length < 10) { // Limit debate length for demo
                 setTimeout(mockProfessorTurn, 1500 + Math.random() * 1500);
             } else {
                 endDebateInternal("The debate has reached its time limit. A thought-provoking exchange!");
@@ -199,28 +292,27 @@ export const AppProvider = ({ children }) => {
     };
 
 
-    // Lecture specific context (sendLectureMessageToBackend, endLectureByUser) are assumed to be defined as before.
-    const sendLectureMessageToBackend = (messageText) => { /* ... from previous step ... */ };
-    const endLectureByUser = () => { /* ... from previous step ... */ };
-
-
     const value = {
         currentPage, setCurrentPage,
         selectedProfessor, setSelectedProfessor, selectedTopic, setSelectedTopic,
         professors: PROFESSORS_DATA, userProfile: USER_PROFILE_DATA, ranking: RANKING_DATA, suggestions: SUGGESTIONS_DATA,
-        navigateToHome, navigateToProfessor: navigateToProfessorPage, navigateToLecture, navigateToInverseLecture, navigateToDebate: navigateToDebatePage, // Use renamed debate navigator
+        navigateToHome, navigateToProfessor: navigateToProfessorPage, navigateToLecture, navigateToInverseLecture, navigateToDebate: navigateToDebatePage,
 
         // Lecture context
-        lectureMessages, lectureInputValue, setLectureInputValue, sendLectureMessageToBackend, endLectureByUser,
-        isLectureOverByBackend, lectureTargetProfessor, currentLectureTopic,
+        lectureMessages, lectureInputValue, setLectureInputValue,
+        sendLectureMessageToBackend, // This now talks to the API
+        endLectureByUser,
+        isLectureOverByBackend,
+        lectureTargetProfessor, currentLectureTopic,
+        isLectureLoading, // Expose loading state
 
         // Debate context
         debateParticipants, toggleDebateParticipant, debateMessages, debateInputValue, setDebateInputValue,
         isDebateActive, isDebateOverByBackend, debateTopic, setDebateTopic,
-        startDebate: startDebateInternal, // Expose internal start function
+        startDebate: startDebateInternal,
         sendDebateMessage,
-        resetDebate: resetDebateAction, // Expose internal reset function
-        PROFESSORS_DATA, // Make sure this is available for DebatePage to get professor details
+        resetDebate: resetDebateAction,
+        PROFESSORS_DATA,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
