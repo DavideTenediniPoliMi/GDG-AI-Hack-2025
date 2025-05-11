@@ -162,4 +162,5 @@ for agent in ["math_teacher", "history_teacher"]:
 
 # --- Run application
 app = graph.compile()
+
 app.invoke({"user_input": "", "selected_agent": "math_teacher", "exit": False})

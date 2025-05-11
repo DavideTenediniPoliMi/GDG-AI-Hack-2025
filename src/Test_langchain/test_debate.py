@@ -34,6 +34,7 @@ load_dotenv()
 # --- Shared state
 class AgentState(TypedDict):
     user_input: str
+    current_state: Literal["math_teacher", "history_teacher"]
     speaker_state: Literal["waiting", "math_teacher", "history_teacher"]
     exit: bool
 
@@ -72,24 +73,24 @@ history_chain = make_teacher_chain(llm_history, history_memory, history_system_p
 def math_teacher_node(state: AgentState) -> AgentState:
     response = math_chain.predict(input=state['user_input'])
     print("\nMath Teacher:", response)
-    return {**state, 'user_input': response, 'speaker_state': 'waiting'}
+    return {**state, 'user_input': response, 'speaker_state': 'waiting', 'current_state': 'math_teacher'}
 
 def history_teacher_node(state: AgentState) -> AgentState:
     response = history_chain.predict(input=state['user_input'])
     print("\nHistory Teacher:", response)
-    return {**state, 'user_input': response, 'speaker_state': 'waiting'}
+    return {**state, 'user_input': response, 'speaker_state': 'waiting', 'current_state': 'history_teacher'}
 
 def waiting_node(state: AgentState) -> AgentState:
     print("\n[WAITING] Press Enter to continue or type a user intervention:")
     user_inp = input().strip()
-    
+
     if user_inp.lower() in ['exit', 'quit']:
         return {**state, 'exit': True}
     
     if user_inp:
         print("You (as Grodor):", user_inp)
         # When user intervenes, alternate from last speaker
-        next_speaker = 'history_teacher' if state['speaker_state'] == 'math_teacher' else 'math_teacher'
+        next_speaker = 'history_teacher' if state['current_state'] == 'math_teacher' else 'math_teacher'
         return {
             **state, 
             'user_input': f"Grodor: {user_inp}", 
@@ -97,7 +98,7 @@ def waiting_node(state: AgentState) -> AgentState:
         }
     else:
         # When continuing naturally, alternate based on last speaker
-        next_speaker = 'history_teacher' if state['speaker_state'] == 'math_teacher' else 'math_teacher'
+        next_speaker = 'history_teacher' if state['current_state'] == 'math_teacher' else 'math_teacher'
         # Carry forward the last message as input
         return {
             **state,
@@ -126,7 +127,8 @@ app = graph.compile()
 
 initial_state = {
     'user_input': "Hey Stephanie, how do you think Grodor is doing lately?",
-    'speaker_state': 'math_teacher',  # Changed to math_teacher since they're initiating
+    'speaker_state': 'waiting',  # Changed to math_teacher since they're initiating
+    'current_state': 'math_teacher',
     'exit': False
 }
 
