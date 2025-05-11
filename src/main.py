@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from agent import Agent
+from agent import Professor
 
 # Initialize the agent instance
-agent = Agent()
+agent = Professor()
 
 # FastAPI app
 app = FastAPI()
