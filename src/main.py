@@ -97,7 +97,6 @@ def chat(request: ChatRequest):
 
 
 debate_state = {
-    "state": "WAITING",  # Possible states: WAITING, P1_TALKED, P2_TALKED,
     "last_message": None,
     "last_sender": None,  # Possible senders: 0, 1, 2 # 0: user, 1: prof1, 2: prof2
 }
@@ -111,7 +110,7 @@ def debate(request: DebateRequest):
     p2 = professors.get(request.prof_id2)
     if not p1 or not p2:
         return {"error": "Invalid professor IDs."}
-    # Create a new conversation chain for the debate
+    # Create a conversation chain for the debate
     conversation_chain1, session_id1 = p1.get_or_create_chain(
         request.session_id
     )
@@ -133,14 +132,32 @@ def debate(request: DebateRequest):
     if request.is_initial:
         # Add the initial instruction to the conversation chain
         response = p1.process_query(
-            "You are starting a new debate with another professor. Introduce yourself. The user is also listening and might intervene. The topic is",
+            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool.",
             session_id1,
         )
         debate_state["last_speaker"] = 1
-        debate_state["last_message"] = response
+        debate_state["last_message"] = f"PROF. {p1.name}: " + response
         p2.add_context(
             session_id2,
-            "You are starting a new debate with another professor. Introduce yourself. The user is also listening and might intervene. The topic is",
+            "You are starting a new  discussion with another professor. Introduce yourself in a natural and brief way. There are only you, the other professor, and the user, so keep it brief and casual. The user is also listening and might intervene. Keep your interactions relatively short. The topic about the ethics of using AI as an innovation tool.",
+        )
+    elif request.user_input != "":
+        # Process the user's query
+        p = p1 if debate_state["last_speaker"] == 1 else p2
+        response = p.process_query(
+            debate_state["last_message"]
+            + "\n\nSTUDENT: "
+            + request.user_input,
+            session_id1,
+        )
+        debate_state["last_speaker"] = (
+            2 if debate_state["last_speaker"] == 1 else 1
+        )
+        debate_state["last_message"] = (
+            "STUDENT: "
+            + request.user_input
+            + "\n\nPROF. {p.name}: "
+            + response
         )
     else:
         # Process the user's query
@@ -149,7 +166,7 @@ def debate(request: DebateRequest):
         debate_state["last_speaker"] = (
             2 if debate_state["last_speaker"] == 1 else 1
         )
-        debate_state["last_message"] = response
+        debate_state["last_message"] = f"PROF. {p.name}: " + response
 
     _, _ = end_detection.get_or_create_chain(session_id1)
     end_response = end_detection.process_query(response, session_id1)
