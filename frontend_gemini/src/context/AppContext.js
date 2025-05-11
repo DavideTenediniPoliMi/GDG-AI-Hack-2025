@@ -95,7 +95,7 @@ export const AppProvider = ({ children }) => {
 
 
     // --- LECTURE Functions ---
-    const sendLectureMessageToBackend = async (messageText, prof_id, isInitial = false) => {
+    const sendLectureMessageToBackend = async (messageText, prof_id, isInitial = false, session_closed = false) => {
         if (isLectureOverByBackend || isLectureLoading) return; // Prevent sending if lecture is over or already loading
 
         let userInputToSend = messageText;
@@ -122,6 +122,7 @@ export const AppProvider = ({ children }) => {
                     "user_input": userInputToSend,
                     "prof_id": prof_id,
                     "is_initial": isInitial,
+                    "session_closed": session_closed,
                 }),
             });
 
@@ -137,8 +138,11 @@ export const AppProvider = ({ children }) => {
             // We assume the backend response is a JSON object like { "professor_response": "..." }
             // Adjust this part if your backend returns a different format.
             const professorResponse = data.response;
-
-            if (professorResponse) {
+            const sessionClosed = data.session_closed; // Check if the session is closed
+            if (sessionClosed) {
+                setLectureMessages(prev => [...prev, { sender: 'system', text: 'The lecture has ended as per the professor\'s request.' }]);
+                setIsLectureOverByBackend(true); // End the lecture if backend indicates so
+            } else if (professorResponse) {
                 setLectureMessages(prev => [...prev, { sender: 'professor', text: professorResponse, professorId: lectureTargetProfessor?.id }]);
             } else {
                  // Handle cases where backend responds OK but no message is returned
@@ -156,6 +160,7 @@ export const AppProvider = ({ children }) => {
     };
 
     const endLectureByUser = () => {
+         sendLectureMessageToBackend('<end>', lectureTargetProfessor?.id, false, true);
          setIsLectureOverByBackend(true);
          setLectureMessages(prev => [...prev, { sender: 'system', text: 'You have ended the lecture.' }]);
          // Optionally, send a final message to the backend indicating the end
