@@ -169,7 +169,7 @@ def debate(request: DebateRequest):
         )
     else:
         # Process the user's query
-        p = p1 if debate_state["last_speaker"] == 1 else p2
+        p = p1 if debate_state["last_speaker"] == 2  else p2
         response = p.process_query(debate_state["last_message"], session_id1)
         debate_state["last_speaker"] = (
             2 if debate_state["last_speaker"] == 1 else 1
